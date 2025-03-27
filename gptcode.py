@@ -78,17 +78,17 @@ async def main() -> int:
             result = await Runner.run(main_agent, prompt)
             context = result.to_input_list()
         else:
-            result = await Runner.run(
-                main_agent,
-                context
-                + [
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-            )
-            context += result.to_input_list()
+            # Create a new context to avoid duplicate message IDs
+            new_message = {
+                "role": "user",
+                "content": prompt,
+            }
+            result = await Runner.run(main_agent, context + [new_message])
+            
+            # Only append the new user message and the latest response
+            # to avoid duplicate message IDs
+            context.append(new_message)
+            context.append(result.to_input_list()[-1])
 
         print(f"{result.final_output}")
 
