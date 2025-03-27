@@ -1,11 +1,39 @@
 import asyncio
 import os
 import sys
-from typing import Optional
+import subprocess
+from typing import Optional, Dict, List
 
 from agents import Agent, Runner, RunResult, TResponseInputItem, function_tool
 from dotenv import load_dotenv
 from openai import OpenAI
+
+def get_project_info() -> Dict[str, str]:
+    """Gather information about the current project."""
+    info = {
+        "cwd": os.getcwd(),
+        "files": os.listdir('.'),
+        "is_git_repo": False,
+        "git_branch": "",
+        "git_status": ""
+    }
+    
+    # Check if this is a git repository
+    try:
+        subprocess.check_output(["git", "rev-parse", "--is-inside-work-tree"], stderr=subprocess.DEVNULL)
+        info["is_git_repo"] = True
+        
+        # Get git branch
+        branch = subprocess.check_output(["git", "branch", "--show-current"]).decode().strip()
+        info["git_branch"] = branch
+        
+        # Get git status
+        status = subprocess.check_output(["git", "status", "--short"]).decode().strip()
+        info["git_status"] = status
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    
+    return info
 
 
 async def run_command(command: str) -> str:
@@ -23,8 +51,12 @@ async def run_command(command: str) -> str:
 
 @function_tool
 async def run_command_tool(command: str) -> str:
-    """Run a command in the shell and return the output."""
-    return await run_command(command)
+    """Run a command in the shell after user confirmation and return the output."""
+    confirmation = input(f"Do you want to execute the command: {command}? (y/n): ").strip().lower()
+    if confirmation == 'y':
+        return await run_command(command)
+    else:
+        return "Command execution canceled by user."
 
 
 @function_tool
@@ -75,12 +107,20 @@ async def edit_file(file_path: str, old_string: str, new_string: str) -> str:
         return f"Error: {str(e)}"
 
 
+project_info = get_project_info()
+
 main_agent = Agent(
     name="Main",
-    instructions=f"""You are the Main agent. Your job is to process user requests and determine the best way to handle them. You will either respond directly or delegate to other specialized agents when needed.
-    
-Current working directory: {os.getcwd()}
-Directory contents: {os.listdir('.')}""",
+    instructions=f"""You are GPT Code, an AI assistant specialized in helping with coding tasks. Your job is to process user requests and provide helpful responses for software development tasks.
+
+PROJECT CONTEXT:
+- Working directory: {project_info['cwd']}
+- Files in directory: {', '.join(project_info['files'])}
+- Git repository: {'Yes' if project_info['is_git_repo'] else 'No'}
+- Current branch: {project_info['git_branch'] if project_info['is_git_repo'] else 'N/A'}
+- File status: {project_info['git_status'] if project_info['git_status'] else 'No changes'}
+
+Aim to provide concise, practical responses. For complex tasks, break them down into clear steps.""",
     tools=[run_command_tool, edit_file, replace_file],
     handoffs=[],
 )
