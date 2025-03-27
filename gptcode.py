@@ -1,10 +1,11 @@
-from dotenv import load_dotenv
-from openai import OpenAI
 import asyncio
 import os
 import sys
 from typing import Optional
-from agents import TResponseInputItem, Agent, RunResult, Runner, function_tool
+
+from agents import Agent, Runner, RunResult, TResponseInputItem, function_tool
+from dotenv import load_dotenv
+from openai import OpenAI
 
 
 async def run_command(command: str) -> str:
@@ -27,33 +28,50 @@ async def run_command_tool(command: str) -> str:
 
 
 @function_tool
-async def edit_file(file_path: str, content: str) -> str:
-    """Edit a file using the provided Git diff content."""
-    import tempfile
-    
-    # Create a temporary file with the diff content
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False) as temp:
-        temp.write(content)
-        temp_path = temp.name
-    
+async def replace_file(file_path: str, content: str) -> str:
+    """Replace a file with entirely new content.
+
+    Args:
+        file_path: Path to the file to replace or create
+        content: The new content for the file
+    """
     try:
-        # Apply the patch
-        process = await asyncio.create_subprocess_shell(
-            f"git apply {temp_path}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await process.communicate()
-        
-        # Clean up the temporary file
-        os.unlink(temp_path)
-        
-        if process.returncode != 0:
-            return f"Failed to apply diff: {stderr.decode()}"
-        return f"Successfully applied diff to {file_path}"
+        # Write the file
+        with open(file_path, "w") as f:
+            f.write(content)
+
+        return f"Successfully replaced {file_path}"
     except Exception as e:
-        # Clean up the temporary file in case of exception
-        os.unlink(temp_path)
+        return f"Error: {str(e)}"
+
+
+@function_tool
+async def edit_file(file_path: str, old_string: str, new_string: str) -> str:
+    """Edit a file by replacing specific text with new text.
+
+    Args:
+        file_path: Path to the file to edit
+        old_string: The text to be replaced (must match exactly)
+        new_string: The text to replace it with
+    """
+    try:
+        # Read the file
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        # Verify old_string exists in content
+        if old_string not in content:
+            return f"Error: The specified text was not found in {file_path}"
+
+        # Replace the text
+        new_content = content.replace(old_string, new_string, 1)
+
+        # Write the file
+        with open(file_path, "w") as f:
+            f.write(new_content)
+
+        return f"Successfully edited {file_path}"
+    except Exception as e:
         return f"Error: {str(e)}"
 
 
@@ -63,7 +81,8 @@ main_agent = Agent(
     
 Current working directory: {os.getcwd()}
 Directory contents: {os.listdir('.')}""",
-    tools=[run_command_tool, edit_file],
+    tools=[run_command_tool, edit_file, replace_file],
+    handoffs=[],
 )
 
 
@@ -84,7 +103,7 @@ async def main() -> int:
                 "content": prompt,
             }
             result = await Runner.run(main_agent, context + [new_message])
-            
+
             # Only append the new user message and the latest response
             # to avoid duplicate message IDs
             context.append(new_message)
