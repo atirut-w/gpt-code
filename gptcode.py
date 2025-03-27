@@ -22,21 +22,39 @@ async def run_command(command: str) -> str:
 
 @function_tool
 async def run_command_tool(command: str) -> str:
+    """Run a command in the shell and return the output."""
     return await run_command(command)
 
 
 @function_tool
 async def edit_file(file_path: str, content: str) -> str:
-    """Edit a file with the given diff using Git."""
-    process = await asyncio.create_subprocess_shell(
-        f"git apply --cached {file_path}",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await process.communicate()
-    if process.returncode != 0:
-        return f"Process exited with code {process.returncode}.\n{stderr.decode()}"
-    return stdout.decode()
+    """Edit a file using the provided Git diff content."""
+    import tempfile
+    
+    # Create a temporary file with the diff content
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.diff', delete=False) as temp:
+        temp.write(content)
+        temp_path = temp.name
+    
+    try:
+        # Apply the patch
+        process = await asyncio.create_subprocess_shell(
+            f"git apply {temp_path}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        
+        # Clean up the temporary file
+        os.unlink(temp_path)
+        
+        if process.returncode != 0:
+            return f"Failed to apply diff: {stderr.decode()}"
+        return f"Successfully applied diff to {file_path}"
+    except Exception as e:
+        # Clean up the temporary file in case of exception
+        os.unlink(temp_path)
+        return f"Error: {str(e)}"
 
 
 main_agent = Agent(
