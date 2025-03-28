@@ -305,6 +305,7 @@ async def main() -> int:
                     + [
                         {"role": "user", "content": prompt},
                     ],
+                    max_turns=32
                 )
                 context = result.to_input_list()
 
