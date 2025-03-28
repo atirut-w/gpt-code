@@ -1,7 +1,10 @@
 import asyncio
+import fnmatch
+import glob
 import os
+import re
 import sys
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from agents import Agent, Runner, TResponseInputItem, function_tool, trace
 from dotenv import load_dotenv
@@ -129,16 +132,103 @@ async def edit_tool(file_path: str, old_string: str, new_string: str) -> str:
         return f"Error: {str(e)}"
 
 
+@function_tool
+async def grep_tool(pattern: str, path: Optional[str] = None, include: Optional[str] = None) -> str:
+    """Search file contents using regular expressions.
+
+    Args:
+        pattern: The regular expression pattern to search for
+        path: The directory to search in
+        include: Optional file pattern to include in search (e.g. "*.py")
+    """
+    try:
+        results = []
+        regex = re.compile(pattern)
+        
+        # Default to current directory if path is None
+        search_path = "." if path is None else path
+        
+        # Get files to search
+        files_to_search = []
+        if include:
+            for root, _, files in os.walk(search_path):
+                for file in files:
+                    if fnmatch.fnmatch(file, include):
+                        files_to_search.append(os.path.join(root, file))
+        else:
+            for root, _, files in os.walk(search_path):
+                files_to_search.extend(os.path.join(root, file) for file in files)
+        
+        # Sort by modification time (newest first)
+        files_to_search.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        
+        # Search files
+        for file_path in files_to_search:
+            try:
+                with open(file_path, 'r', errors='ignore') as f:
+                    for i, line in enumerate(f, 1):
+                        if regex.search(line):
+                            results.append(f"{file_path}:{i}: {line.rstrip()}")
+            except (PermissionError, IsADirectoryError):
+                continue
+                
+        if not results:
+            return f"No matches found for pattern '{pattern}'"
+        
+        return "\n".join(results)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+@function_tool
+async def glob_tool(pattern: str, path: Optional[str] = None) -> Union[str, List[str]]:
+    """Find files matching a glob pattern.
+
+    Args:
+        pattern: The glob pattern to match against (e.g. "**/*.py")
+        path: The directory to search in
+    """
+    try:
+        # Default to current directory if path is None
+        search_dir = "." if path is None else path
+        search_path = os.path.join(search_dir, pattern)
+        matches = glob.glob(search_path, recursive=True)
+        
+        # Sort by modification time (newest first)
+        matches.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        
+        if not matches:
+            return f"No files matching pattern '{pattern}' found in {path}"
+        
+        return matches
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+# Remove batch_tool from the tools list for now as it seems to cause schema validation issues
+
+
 main_agent = Agent(
     name="Main Agent",
-    instructions=f"""Assist with coding tasks. If you don't know something, use the available tools or hand off to other agents to let them handle the task.
+    instructions=f"""You are GPT Code, a CLI assistant for software engineering tasks. You help users with coding, debugging, and other programming tasks.
 
-Current directory: {os.getcwd()}""",
+When working with files and code:
+- For file operations, always use absolute paths when possible
+- When editing files, include sufficient context before and after changes
+- Use regex patterns for searching file contents and glob patterns for finding files
+- Run multiple operations in parallel when possible for better performance
+
+Current directory: {os.getcwd()}
+Current operating system: {sys.platform}
+""",
     tools=[
+        run_tool,
         list_tool,
         read_tool,
         replace_tool,
         edit_tool,
+        grep_tool,
+        glob_tool,
     ],
     handoffs=[],
 )
