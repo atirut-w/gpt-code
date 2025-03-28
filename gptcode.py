@@ -120,7 +120,12 @@ main_agent = Agent(
     instructions=f"""Assist with coding tasks. If you don't know something, use the available tools or hand off to other agents to let them handle the task.
 
 Current directory: {os.getcwd()}""",
-    tools=[list_tool, read_tool],
+    tools=[
+        list_tool,
+        read_tool,
+        replace_tool,
+        edit_tool,
+    ],
     handoffs=[],
 )
 
