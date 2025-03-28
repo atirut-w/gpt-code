@@ -109,6 +109,14 @@ async def edit_file(file_path: str, old_string: str, new_string: str) -> str:
 
 project_info = get_project_info()
 
+# This one helps the main agent plan tasks
+planner = Agent(
+    name="Planner",
+    instructions="You are a planning assistant. Your job is to help the main agent plan tasks. You will receive a task and you need to break it down into smaller steps.",
+    tools=[],
+    handoffs=[],
+)
+
 main_agent = Agent(
     name="Main",
     instructions=f"""You are GPT Code, an AI assistant specialized in helping with coding tasks. Your job is to process user requests and provide helpful responses for software development tasks.
@@ -121,8 +129,8 @@ PROJECT CONTEXT:
 - File status: {project_info['git_status'] if project_info['git_status'] else 'No changes'}
 
 Aim to provide concise, practical responses. For complex tasks, break them down into clear steps.""",
-    tools=[run_command_tool, edit_file, replace_file],
-    handoffs=[],
+    tools=[run_command_tool, read_file, edit_file, replace_file],
+    handoffs=[planner],
 )
 
 
