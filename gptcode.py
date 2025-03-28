@@ -126,7 +126,12 @@ async def main() -> int:
 
     while True:
         prompt = input("> ")
-        result = await Runner.run(main_agent, prompt, context=context)
+        result = await Runner.run(main_agent, context + [
+            {
+                "role": "user",
+                "content": prompt
+            },
+        ])
         context = result.to_input_list()
 
         print(f"{result.final_output}")
