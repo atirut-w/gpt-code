@@ -8,31 +8,38 @@ from agents import Agent, Runner, RunResult, TResponseInputItem, function_tool
 from dotenv import load_dotenv
 from openai import OpenAI
 
+
 def get_project_info() -> Dict[str, str]:
     """Gather information about the current project."""
     info = {
         "cwd": os.getcwd(),
-        "files": os.listdir('.'),
+        "files": os.listdir("."),
         "is_git_repo": False,
         "git_branch": "",
-        "git_status": ""
+        "git_status": "",
     }
-    
+
     # Check if this is a git repository
     try:
-        subprocess.check_output(["git", "rev-parse", "--is-inside-work-tree"], stderr=subprocess.DEVNULL)
+        subprocess.check_output(
+            ["git", "rev-parse", "--is-inside-work-tree"], stderr=subprocess.DEVNULL
+        )
         info["is_git_repo"] = True
-        
+
         # Get git branch
-        branch = subprocess.check_output(["git", "branch", "--show-current"]).decode().strip()
+        branch = (
+            subprocess.check_output(["git", "branch", "--show-current"])
+            .decode()
+            .strip()
+        )
         info["git_branch"] = branch
-        
+
         # Get git status
         status = subprocess.check_output(["git", "status", "--short"]).decode().strip()
         info["git_status"] = status
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
-    
+
     return info
 
 
@@ -52,11 +59,28 @@ async def run_command(command: str) -> str:
 @function_tool
 async def run_command_tool(command: str) -> str:
     """Run a command in the shell after user confirmation and return the output."""
-    confirmation = input(f"Do you want to execute the command: {command}? (y/n): ").strip().lower()
-    if confirmation == 'y':
+    confirmation = (
+        input(f"Do you want to execute the command: {command}? (y/n): ").strip().lower()
+    )
+    if confirmation == "y":
         return await run_command(command)
     else:
         return "Command execution canceled by user."
+
+
+@function_tool
+async def read_file(file_path: str) -> str:
+    """Read the content of a file.
+
+    Args:
+        file_path: Path to the file to read
+    """
+    try:
+        with open(file_path, "r") as f:
+            content = f.read()
+        return content
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @function_tool
