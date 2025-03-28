@@ -51,18 +51,32 @@ async def list_tool(directory: str) -> str | List[str]:
 
 
 @function_tool
-async def read_tool(file_path: str) -> str:
-    """Read the content of a file with an optional limit on the number of characters and an offset.
+async def read_tool(file_path: str, offset: Optional[int] = None, limit: Optional[int] = None) -> str:
+    """Read the content of a file with an optional limit on the number of lines and an offset.
 
     Args:
         file_path: Path to the file to read
-        offset: Optional offset to start reading from (default is 0)
-        limit: Optional limit on the number of characters to read
+        offset: Optional line number to start reading from
+        limit: Optional limit on the number of lines to read
     """
     try:
-        with open(file_path, "r") as f:
-            return f.read()
-        return content
+        with open(file_path, "r", errors='ignore') as f:
+            lines = f.readlines()
+        
+        start_line = 0
+        if offset is not None and offset > 0:
+            start_line = offset
+            lines = lines[start_line:]
+            
+        if limit is not None:
+            lines = lines[:limit]
+            
+        # Format with line numbers like Claude Code's View tool
+        result = []
+        for i, line in enumerate(lines, start_line + 1):
+            result.append(f"{i:6d}\t{line}")
+            
+        return "".join(result)
     except Exception as e:
         return f"Error: {str(e)}"
 
