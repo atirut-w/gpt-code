@@ -216,7 +216,6 @@ When working with files and code:
 - For file operations, always use absolute paths when possible
 - When editing files, include sufficient context before and after changes
 - Use regex patterns for searching file contents and glob patterns for finding files
-- Run multiple operations in parallel when possible for better performance
 
 Current directory: {os.getcwd()}
 Current operating system: {sys.platform}
