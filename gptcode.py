@@ -146,21 +146,67 @@ Current directory: {os.getcwd()}""",
 
 async def main() -> int:
     context: list[TResponseInputItem] = []
+    
+    # Print welcome message
+    print("Welcome to GPT Code - a CLI assistant for software engineering tasks")
+    print("Type '/help' for available commands or '/exit' to quit")
+    print()
 
     with trace("GPT Code"):
         while True:
-            prompt = input("> ")
-            result = await Runner.run(main_agent, context + [
-                {
-                    "role": "user",
-                    "content": prompt
-                },
-            ])
-            context = result.to_input_list()
+            try:
+                prompt = input("\033[1;36m>\033[0m ")  # Cyan prompt for visibility
+                
+                # Handle special commands
+                if prompt.strip() == "/help":
+                    print("\nGPT Code Commands:")
+                    print("  /help      - Show this help message")
+                    print("  /clear     - Clear conversation history")
+                    print("  /exit      - Exit GPT Code")
+                    print()
+                    continue
+                
+                if prompt.strip() == "/clear":
+                    context = []
+                    print("Conversation history cleared.")
+                    continue
+                
+                if prompt.strip() in ["/exit", "/quit"]:
+                    return 0
+                
+                # Process normal prompts
+                result = await Runner.run(main_agent, context + [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    },
+                ])
+                context = result.to_input_list()
 
-            print(f"{result.final_output}")
+                # Print the result
+                print(f"\n{result.final_output}")
+                
+            except KeyboardInterrupt:
+                print("\nUse '/exit' to quit GPT Code")
+                continue
+            except Exception as e:
+                print(f"Error: {str(e)}")
+
+
+def setup_environment():
+    """Set up the environment for GPT Code."""
+    load_dotenv()
+    
+    # Create banner
+    print("\033[1;32m")  # Bright green
+    print("  ____  ____  _____    ____          _      ")
+    print(" / ___||  _ \\|_   _|  / ___|___   __| | ___ ")
+    print("| |  _ | |_) | | |   | |   / _ \\ / _` |/ _ \\")
+    print("| |_| ||  __/  | |   | |__| (_) | (_| |  __/")
+    print(" \\____||_|     |_|    \\____\\___/ \\__,_|\\___|")
+    print("\033[0m")  # Reset color
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    setup_environment()
     sys.exit(asyncio.run(main()))
