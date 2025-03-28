@@ -22,7 +22,11 @@ async def run_command(command: str) -> str:
 
 @function_tool
 async def run_tool(command: str) -> str:
-    """Run a command in the shell after user confirmation and return the output."""
+    """Run a command in the shell after user confirmation and return the output.
+    
+    Args:
+        command: The command to run
+    """
     confirmation = (
         input(f"Do you want to execute the command: {command}? (y/n): ").strip().lower()
     )
