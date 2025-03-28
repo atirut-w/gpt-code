@@ -3,7 +3,7 @@ import os
 import sys
 from typing import List, Optional
 
-from agents import Agent, Runner, TResponseInputItem, function_tool
+from agents import Agent, Runner, TResponseInputItem, function_tool, trace
 from dotenv import load_dotenv
 
 
@@ -124,17 +124,18 @@ Current directory: {os.getcwd()}""",
 async def main() -> int:
     context: list[TResponseInputItem] = []
 
-    while True:
-        prompt = input("> ")
-        result = await Runner.run(main_agent, context + [
-            {
-                "role": "user",
-                "content": prompt
-            },
-        ])
-        context = result.to_input_list()
+    with trace("GPT Code"):
+        while True:
+            prompt = input("> ")
+            result = await Runner.run(main_agent, context + [
+                {
+                    "role": "user",
+                    "content": prompt
+                },
+            ])
+            context = result.to_input_list()
 
-        print(f"{result.final_output}")
+            print(f"{result.final_output}")
 
 
 if __name__ == "__main__":
