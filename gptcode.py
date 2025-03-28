@@ -1,46 +1,10 @@
 import asyncio
 import os
 import sys
-import subprocess
-from typing import Optional, Dict, List
+from typing import List, Optional
 
-from agents import Agent, Runner, RunResult, TResponseInputItem, function_tool
+from agents import Agent, Runner, TResponseInputItem, function_tool
 from dotenv import load_dotenv
-from openai import OpenAI
-
-
-def get_project_info() -> Dict[str, str]:
-    """Gather information about the current project."""
-    info = {
-        "cwd": os.getcwd(),
-        "files": os.listdir("."),
-        "is_git_repo": False,
-        "git_branch": "",
-        "git_status": "",
-    }
-
-    # Check if this is a git repository
-    try:
-        subprocess.check_output(
-            ["git", "rev-parse", "--is-inside-work-tree"], stderr=subprocess.DEVNULL
-        )
-        info["is_git_repo"] = True
-
-        # Get git branch
-        branch = (
-            subprocess.check_output(["git", "branch", "--show-current"])
-            .decode()
-            .strip()
-        )
-        info["git_branch"] = branch
-
-        # Get git status
-        status = subprocess.check_output(["git", "status", "--short"]).decode().strip()
-        info["git_status"] = status
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
-
-    return info
 
 
 async def run_command(command: str) -> str:
@@ -57,7 +21,7 @@ async def run_command(command: str) -> str:
 
 
 @function_tool
-async def run_command_tool(command: str) -> str:
+async def run_tool(command: str) -> str:
     """Run a command in the shell after user confirmation and return the output."""
     confirmation = (
         input(f"Do you want to execute the command: {command}? (y/n): ").strip().lower()
@@ -69,22 +33,38 @@ async def run_command_tool(command: str) -> str:
 
 
 @function_tool
-async def read_file(file_path: str) -> str:
-    """Read the content of a file.
+async def list_tool(directory: str) -> str | List[str]:
+    """List all files in a directory.
+
+    Args:
+        directory: Path to the directory to list
+    """
+    try:
+        files = os.listdir(directory)
+        return files
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+@function_tool
+async def read_tool(file_path: str) -> str:
+    """Read the content of a file with an optional limit on the number of characters and an offset.
 
     Args:
         file_path: Path to the file to read
+        offset: Optional offset to start reading from (default is 0)
+        limit: Optional limit on the number of characters to read
     """
     try:
         with open(file_path, "r") as f:
-            content = f.read()
+            return f.read()
         return content
     except Exception as e:
         return f"Error: {str(e)}"
 
 
 @function_tool
-async def replace_file(file_path: str, content: str) -> str:
+async def replace_tool(file_path: str, content: str) -> str:
     """Replace a file with entirely new content.
 
     Args:
@@ -102,7 +82,7 @@ async def replace_file(file_path: str, content: str) -> str:
 
 
 @function_tool
-async def edit_file(file_path: str, old_string: str, new_string: str) -> str:
+async def edit_tool(file_path: str, old_string: str, new_string: str) -> str:
     """Edit a file by replacing specific text with new text.
 
     Args:
@@ -131,30 +111,13 @@ async def edit_file(file_path: str, old_string: str, new_string: str) -> str:
         return f"Error: {str(e)}"
 
 
-project_info = get_project_info()
-
-# This one helps the main agent plan tasks
-planner = Agent(
-    name="Planner",
-    instructions="You are a planning assistant. Your job is to help the main agent plan tasks. You will receive a task and you need to break it down into smaller steps.",
-    tools=[],
-    handoffs=[],
-)
-
 main_agent = Agent(
-    name="Main",
-    instructions=f"""You are GPT Code, an AI assistant specialized in helping with coding tasks. Your job is to process user requests and provide helpful responses for software development tasks.
+    name="Main Agent",
+    instructions=f"""Assist with coding tasks. If you don't know something, use the available tools or hand off to other agents to let them handle the task.
 
-PROJECT CONTEXT:
-- Working directory: {project_info['cwd']}
-- Files in directory: {', '.join(project_info['files'])}
-- Git repository: {'Yes' if project_info['is_git_repo'] else 'No'}
-- Current branch: {project_info['git_branch'] if project_info['is_git_repo'] else 'N/A'}
-- File status: {project_info['git_status'] if project_info['git_status'] else 'No changes'}
-
-Aim to provide concise, practical responses. For complex tasks, break them down into clear steps.""",
-    tools=[run_command_tool, read_file, edit_file, replace_file],
-    handoffs=[planner],
+Current directory: {os.getcwd()}""",
+    tools=[list_tool, read_tool],
+    handoffs=[],
 )
 
 
